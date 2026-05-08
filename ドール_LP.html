@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ドール — 第三陣 セッションログ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Noto+Serif+JP:wght@400;600;900&family=Zen+Maru+Gothic:wght@400;500;700&family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #14151c;
+    --paper: #ece4d3;
+    --paper-deep: #ddd1b6;
+    --night: #07080d;
+    --witch: #2a1a3a;
+    --witch-deep: #1a0e2a;
+    --moss-deep: #2d3a25;
+    --bloom: #e8c5c2;
+    --rust: #8a4a3c;
+    --gold: #c9a04a;
+    --gold-bright: #e8c870;
+    --gold-soft: #d4b884;
+    --doll-pale: #c8c0b4;
+    --doll-shadow: #6a5e7a;
+    --shadow: rgba(20, 21, 28, 0.32);
+
+    --scroll: 0;
+    --mood-tint: rgba(0, 0, 0, 0);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: "Zen Maru Gothic", "Noto Serif JP", serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.85;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* ─── 全体オーバーレイ ─── */
+  .grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9000;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.18 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: grain-shift 8s steps(8) infinite;
+  }
+  @keyframes grain-shift {
+    0%   { transform: translate(0,0); }
+    20%  { transform: translate(-3%,-2%); }
+    40%  { transform: translate(2%, 3%); }
+    60%  { transform: translate(-2%,-4%); }
+    80%  { transform: translate(3%, 1%); }
+    100% { transform: translate(0,0); }
+  }
+
+  .mood-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 8000;
+    background: var(--mood-tint);
+    transition: background 1.2s ease;
+    mix-blend-mode: multiply;
+  }
+
+  .progress-bar {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 2px;
+    z-index: 9500;
+    background: rgba(201, 160, 74, 0.1);
+  }
+  .progress-bar::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    width: calc(var(--scroll) * 100%);
+    background: linear-gradient(90deg, var(--gold), var(--witch), var(--gold-bright));
+    box-shadow: 0 0 8px var(--gold);
+  }
+
+  /* ─── カスタムカーソル ─── */
+  .cursor-dot, .cursor-ring {
+    position: fixed;
+    top: 0; left: 0;
+    pointer-events: none;
+    z-index: 9999;
+    will-change: transform;
+    mix-blend-mode: difference;
+  }
+  .cursor-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold-bright);
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+  }
+  .cursor-ring {
+    width: 36px; height: 36px;
+    border: 1px solid var(--gold);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.4s ease, height 0.4s ease, border-color 0.4s ease, opacity 0.4s ease;
+    opacity: 0.6;
+  }
+  body.hover-active .cursor-ring {
+    width: 60px; height: 60px;
+    border-color: var(--bloom);
+    opacity: 1;
+  }
+  body.hover-active .cursor-dot { width: 4px; height: 4px; }
+  @media (max-width: 768px) {
+    body { cursor: auto; }
+    .cursor-dot, .cursor-ring { display: none; }
+  }
+
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 1s cubic-bezier(0.2, 0.8, 0.2, 1),
+                transform 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition-delay: var(--delay, 0s);
+  }
+  [data-reveal].is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ╔═══════════════════════════════════════╗
+     ║  HERO 「神の光と魔女の館」            ║
+     ╚═══════════════════════════════════════╝ */
+  .hero {
+    min-height: 100vh;
+    background:
+      linear-gradient(180deg, rgba(7, 8, 13, 0.85) 0%, rgba(26, 14, 42, 0.95) 100%),
+      radial-gradient(ellipse at 50% 35%, rgba(201, 160, 74, 0.22) 0%, transparent 60%);
+    color: var(--paper);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    padding: 4rem 2rem;
+    overflow: hidden;
+  }
+
+  /* 神の光 - 中央から放射（コニックグラデの回転で擬似ゴッドレイ） */
+  .hero::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 200vmin;
+    height: 200vmin;
+    transform: translate(-50%, -50%);
+    background:
+      conic-gradient(from 0deg,
+        transparent 0deg,
+        rgba(201, 160, 74, 0.05) 5deg,
+        transparent 10deg,
+        rgba(201, 160, 74, 0.08) 30deg,
+        transparent 40deg,
+        rgba(201, 160, 74, 0.04) 90deg,
+        transparent 100deg,
+        rgba(201, 160, 74, 0.06) 150deg,
+        transparent 160deg,
+        rgba(201, 160, 74, 0.03) 200deg,
+        transparent 220deg,
+        rgba(201, 160, 74, 0.07) 280deg,
+        transparent 300deg);
+    animation: god-rays 80s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes god-rays {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+  }
+
+  /* 魔法陣 - 多重リング */
+  .magic-circle {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.2;
+  }
+  .magic-circle svg {
+    width: 100%;
+    height: 100%;
+  }
+  .ring-rotate-slow { animation: ring-rotate 90s linear infinite; transform-origin: center; transform-box: fill-box; }
+  .ring-rotate-mid { animation: ring-rotate 60s linear infinite reverse; transform-origin: center; transform-box: fill-box; }
+  .ring-rotate-fast { animation: ring-rotate 40s linear infinite; transform-origin: center; transform-box: fill-box; }
+  @keyframes ring-rotate {
+    to { transform: rotate(360deg); }
+  }
+  .draw-stroke {
+    stroke-dasharray: 2000;
+    stroke-dashoffset: 2000;
+    animation: stroke-draw 4s cubic-bezier(0.5, 0, 0.5, 1) forwards;
+  }
+  @keyframes stroke-draw {
+    to { stroke-dashoffset: 0; }
+  }
+
+  /* 金の粒子 */
+  .particles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .particle {
+    position: absolute;
+    width: 2px; height: 2px;
+    background: var(--gold-bright);
+    border-radius: 50%;
+    box-shadow: 0 0 4px var(--gold-bright);
+    opacity: 0;
+    animation: particle-rise 8s ease-in infinite;
+  }
+  .particle:nth-child(1)  { left: 10%; animation-delay: 0s;   animation-duration: 7s; }
+  .particle:nth-child(2)  { left: 20%; animation-delay: 1.2s; animation-duration: 9s; }
+  .particle:nth-child(3)  { left: 30%; animation-delay: 2.4s; animation-duration: 8s; }
+  .particle:nth-child(4)  { left: 42%; animation-delay: 0.8s; animation-duration: 10s;}
+  .particle:nth-child(5)  { left: 55%; animation-delay: 3.6s; animation-duration: 7s; }
+  .particle:nth-child(6)  { left: 65%; animation-delay: 1.8s; animation-duration: 9s; }
+  .particle:nth-child(7)  { left: 75%; animation-delay: 4.2s; animation-duration: 8s; }
+  .particle:nth-child(8)  { left: 85%; animation-delay: 2.6s; animation-duration: 11s;}
+  .particle:nth-child(9)  { left: 92%; animation-delay: 5s;   animation-duration: 7s; }
+  .particle:nth-child(10) { left: 5%;  animation-delay: 3s;   animation-duration: 10s;}
+  @keyframes particle-rise {
+    0%   { transform: translateY(110vh) scale(0); opacity: 0; }
+    20%  { opacity: 1; }
+    80%  { opacity: 0.8; }
+    100% { transform: translateY(-10vh) scale(1.5); opacity: 0; }
+  }
+
+  .hero-meta {
+    font-family: "Cinzel", serif;
+    font-size: 0.78rem;
+    letter-spacing: 0.5em;
+    color: var(--gold);
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 2;
+    opacity: 0;
+    animation: hero-up 1s ease-out 1s forwards;
+  }
+
+  .hero-title {
+    font-family: "Noto Serif JP", serif;
+    font-weight: 900;
+    font-size: clamp(3.5rem, 11vw, 8rem);
+    letter-spacing: 0.25em;
+    line-height: 1.1;
+    margin-bottom: 0.5rem;
+    position: relative;
+    z-index: 2;
+    text-shadow: 0 4px 30px rgba(201, 160, 74, 0.5);
+  }
+  .hero-title .ch {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(50px) rotate(0deg);
+    animation: title-letter 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: calc(1.4s + var(--i) * 0.12s);
+  }
+  .hero-title .ch:nth-child(2n) {
+    animation-name: title-letter-alt;
+  }
+  @keyframes title-letter {
+    0%   { opacity: 0; transform: translateY(50px) rotate(-3deg); filter: blur(8px); }
+    100% { opacity: 1; transform: translateY(0) rotate(0); filter: blur(0); }
+  }
+  @keyframes title-letter-alt {
+    0%   { opacity: 0; transform: translateY(60px) rotate(3deg); filter: blur(10px); }
+    100% { opacity: 1; transform: translateY(0) rotate(0); filter: blur(0); }
+  }
+
+  .hero-title-en {
+    font-family: "Cinzel", serif;
+    font-weight: 700;
+    font-size: clamp(0.9rem, 1.6vw, 1.2rem);
+    letter-spacing: 0.6em;
+    color: var(--gold);
+    margin-top: 1.4rem;
+    position: relative;
+    z-index: 2;
+    opacity: 0;
+    animation: hero-up 1s ease-out 3s forwards;
+  }
+  .hero-title-en::before, .hero-title-en::after {
+    content: "─";
+    margin: 0 1em;
+    color: var(--gold);
+    opacity: 0.5;
+  }
+
+  .hero-sub {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    font-size: clamp(1rem, 1.9vw, 1.35rem);
+    color: var(--paper);
+    opacity: 0;
+    margin-top: 2rem;
+    max-width: 640px;
+    position: relative;
+    z-index: 2;
+    animation: hero-up 1.2s ease-out 3.4s forwards;
+    line-height: 2;
+  }
+
+  .hero-info {
+    margin-top: 3rem;
+    display: flex;
+    gap: 3rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    position: relative;
+    z-index: 2;
+  }
+  .hero-info > div {
+    border-top: 1px solid var(--gold);
+    padding-top: 0.8rem;
+    min-width: 130px;
+    opacity: 0;
+    animation: hero-up 0.8s ease-out forwards;
+  }
+  .hero-info > div:nth-child(1) { animation-delay: 4.0s; }
+  .hero-info > div:nth-child(2) { animation-delay: 4.15s; }
+  .hero-info > div:nth-child(3) { animation-delay: 4.30s; }
+  .hero-info > div:nth-child(4) { animation-delay: 4.45s; }
+
+  .hero-info-label {
+    font-family: "Cinzel", serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+  .hero-info-value {
+    font-size: 1rem;
+    color: var(--paper);
+    margin-top: 0.3rem;
+  }
+
+  .scroll-hint {
+    position: absolute;
+    bottom: 3rem;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--gold);
+    font-family: "Cinzel", serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    z-index: 2;
+    opacity: 0;
+    animation: hero-up 1s ease-out 5s forwards;
+  }
+  .scroll-hint::after {
+    content: "";
+    display: block;
+    width: 1px;
+    height: 30px;
+    background: linear-gradient(180deg, var(--gold), transparent);
+    margin: 1rem auto 0;
+    animation: scroll-pulse 2.5s ease-in-out infinite;
+  }
+  @keyframes scroll-pulse {
+    0%, 100% { transform: scaleY(0.4); opacity: 0.4; transform-origin: top; }
+    50%      { transform: scaleY(1.0); opacity: 1.0; }
+  }
+
+  @keyframes hero-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ╔═══════════════════════════════════════╗
+     ║  SECTION COMMON                        ║
+     ╚═══════════════════════════════════════╝ */
+  section {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 7rem 2rem;
+    position: relative;
+  }
+
+  .section-num {
+    font-family: "Cinzel", serif;
+    font-size: 0.78rem;
+    letter-spacing: 0.4em;
+    color: var(--gold);
+    margin-bottom: 0.8rem;
+  }
+
+  .section-title {
+    font-family: "Noto Serif JP", serif;
+    font-weight: 900;
+    font-size: clamp(2rem, 4.5vw, 3.4rem);
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  .section-title-en {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    font-size: 1.1rem;
+    color: var(--moss-deep);
+    margin-bottom: 3rem;
+    opacity: 0.6;
+  }
+
+  .divider {
+    width: 80px;
+    height: 1px;
+    background: var(--gold);
+    margin: 0 0 3rem 0;
+    position: relative;
+    transform-origin: left;
+    transform: scaleX(0);
+    transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
+  }
+  .is-visible .divider { transform: scaleX(1); }
+  /* 線とドットを離すことで「装飾としての句読点」感を出す */
+  .divider::before, .divider::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--gold);
+    transform: translateY(-50%);
+  }
+  .divider::before { left: -8px; }
+  .divider::after { right: -8px; }
+
+  /* ╔═══════════════════════════════════════╗
+     ║  あらすじ                              ║
+     ╚═══════════════════════════════════════╝ */
+  .story {
+    background: linear-gradient(180deg, var(--paper) 0%, var(--paper-deep) 100%);
+  }
+
+  .story-text {
+    font-family: "Noto Serif JP", serif;
+    font-size: 1.08rem;
+    line-height: 2.2;
+    max-width: 760px;
+    color: var(--ink);
+  }
+  .story-text p { margin-bottom: 1.5rem; }
+
+  .story-text p:first-of-type::first-letter {
+    font-family: "Cormorant Garamond", serif;
+    font-size: 3em;
+    float: left;
+    line-height: 0.9;
+    margin: 0.1em 0.1em 0 0;
+    color: var(--gold);
+  }
+
+  .story-text p:not(:last-child)::after {
+    content: "";
+    display: block;
+    width: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    margin: 1.5rem 0;
+    opacity: 0;
+    transition: width 1.5s ease 0.3s, opacity 1s ease 0.5s;
+  }
+  .is-visible .story-text p:not(:last-child)::after {
+    width: 60%;
+    opacity: 0.5;
+  }
+
+  .ornament {
+    text-align: center;
+    color: var(--gold);
+    font-size: 1.1rem;
+    margin: 3rem 0;
+    letter-spacing: 1.3em;
+  }
+
+  /* ╔═══════════════════════════════════════╗
+     ║  タイムライン                          ║
+     ╚═══════════════════════════════════════╝ */
+  .timeline {
+    background: var(--night);
+    color: var(--paper);
+    position: relative;
+    overflow: hidden;
+  }
+  .timeline::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+  .timeline::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0; right: 0;
+    height: 60%;
+    background: radial-gradient(ellipse at center, rgba(42, 26, 58, 0.3) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .timeline > * { position: relative; z-index: 1; }
+
+  .timeline .section-title { color: var(--paper); }
+  .timeline .section-title-en { color: var(--gold-soft); }
+  .timeline .divider { background: var(--gold-bright); }
+
+  .timeline-track {
+    position: relative;
+    padding-left: 2.5rem;
+    margin-left: 1rem;
+  }
+  .timeline-track::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg,
+      var(--gold) 0%,
+      var(--gold) 25%,
+      var(--witch) 60%,
+      var(--gold-bright) 100%);
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform 2s cubic-bezier(0.4, 0, 0.2, 1) 0.4s;
+  }
+  .timeline.is-visible .timeline-track::before { transform: scaleY(1); }
+
+  .timeline-item {
+    position: relative;
+    padding-bottom: 3.5rem;
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: opacity 1s ease, transform 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition-delay: calc(var(--i) * 0.1s);
+  }
+  .timeline-item.is-visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .timeline-item::before {
+    content: "";
+    position: absolute;
+    /* 円(直径12px)中心を縦軸に揃える: -(padding 2.5rem) - (border 1px) - (半径 6px) */
+    left: -2.94rem;
+    top: 0.4rem;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--gold);
+    border: 3px solid var(--night);
+    box-shadow: 0 0 0 1px var(--gold);
+    transform: scale(0);
+    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s, background 0.5s, box-shadow 0.5s;
+  }
+  .timeline-item.is-visible::before { transform: scale(1); }
+
+  .timeline-item.witch::before {
+    background: var(--witch);
+    box-shadow: 0 0 0 1px var(--bloom);
+  }
+  .timeline-item.god::before {
+    background: var(--gold-bright);
+    box-shadow: 0 0 0 1px var(--gold-bright), 0 0 16px var(--gold);
+    animation: god-pulse 2.5s ease-in-out infinite;
+    animation-delay: 1.2s;
+  }
+  @keyframes god-pulse {
+    0%, 100% { box-shadow: 0 0 0 1px var(--gold-bright), 0 0 12px var(--gold); }
+    50%      { box-shadow: 0 0 0 1px var(--gold-bright), 0 0 28px var(--gold-bright), 0 0 48px rgba(201, 160, 74, 0.5); }
+  }
+
+  .timeline-act {
+    font-family: "Cinzel", serif;
+    font-size: 0.74rem;
+    letter-spacing: 0.3em;
+    color: var(--gold);
+    margin-bottom: 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .timeline-tag {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    color: var(--gold-soft);
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    opacity: 0.8;
+  }
+
+  .timeline-head {
+    font-family: "Noto Serif JP", serif;
+    font-weight: 600;
+    font-size: 1.45rem;
+    color: var(--paper);
+    margin-bottom: 0.7rem;
+  }
+  .timeline-item.god .timeline-head { color: var(--gold-bright); }
+  .timeline-item.witch .timeline-head { color: var(--bloom); }
+
+  .timeline-body {
+    color: var(--gold-soft);
+    line-height: 2;
+    max-width: 720px;
+    font-size: 0.95rem;
+  }
+
+  .roll {
+    display: inline-block;
+    font-family: "Cinzel", serif;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    padding: 0.15em 0.6em;
+    border: 1px solid var(--gold);
+    border-radius: 2px;
+    margin: 0 0.2em;
+    color: var(--gold);
+    transition: transform 0.2s, background 0.2s, color 0.2s;
+  }
+  .roll:hover { transform: translateY(-2px); background: var(--gold); color: var(--night); }
+  .roll.fail { color: var(--rust); border-color: var(--rust); }
+  .roll.fail:hover { background: var(--rust); color: var(--paper); }
+  .roll.crit { color: var(--night); background: var(--gold); border-color: var(--gold); }
+  .roll.crit:hover { box-shadow: 0 0 12px var(--gold); }
+
+  /* ╔═══════════════════════════════════════╗
+     ║  キャラクター                          ║
+     ╚═══════════════════════════════════════╝ */
+  .characters {
+    background: var(--paper);
+  }
+
+  .char-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.8rem;
+  }
+
+  .char-card {
+    background: #f7efde;
+    border: 1px solid var(--paper-deep);
+    border-radius: 2px;
+    padding: 2rem 1.8rem;
+    position: relative;
+    box-shadow:
+      0 1px 0 rgba(0,0,0,0.04),
+      0 8px 24px -8px var(--shadow);
+    transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+                box-shadow 0.5s, border-color 0.5s;
+    overflow: hidden;
+    transform-style: preserve-3d;
+  }
+  .char-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 22px 48px -14px rgba(20, 21, 28, 0.4);
+    border-color: var(--gold);
+  }
+
+  /* ホバーで光沢が走る */
+  .char-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: -100%;
+    width: 50%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(212, 184, 132, 0.25), transparent);
+    transition: left 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+    z-index: 2;
+    pointer-events: none;
+  }
+  .char-card:hover::before { left: 130%; }
+
+  /* 対角コーナー罫線（古文書の証書のような軽やかさ） */
+  .corner-tr, .corner-bl {
+    position: absolute;
+    width: 30px; height: 30px;
+    pointer-events: none;
+    transition: opacity 0.4s, width 0.4s, height 0.4s;
+    opacity: 0.5;
+  }
+  .corner-tr { top: 1rem; right: 1rem; border-top: 1px solid var(--gold); border-right: 1px solid var(--gold); }
+  .corner-bl { bottom: 1rem; left: 1rem; border-bottom: 1px solid var(--gold); border-left: 1px solid var(--gold); }
+  .char-card:hover .corner-tr, .char-card:hover .corner-bl {
+    opacity: 1; width: 40px; height: 40px;
+  }
+
+  .char-tag {
+    font-family: "Cinzel", serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    color: var(--gold);
+    margin-bottom: 0.5rem;
+  }
+
+  .char-name {
+    font-family: "Noto Serif JP", serif;
+    font-weight: 700;
+    font-size: 1.55rem;
+    line-height: 1.3;
+    margin-bottom: 0.3rem;
+  }
+
+  .char-reading {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    color: var(--moss-deep);
+    opacity: 0.7;
+    margin-bottom: 1.2rem;
+    font-size: 0.95rem;
+  }
+
+  .char-epithet {
+    display: inline-block;
+    background: var(--ink);
+    color: var(--gold-soft);
+    padding: 0.2em 0.8em;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    margin-bottom: 1.2rem;
+    transition: background 0.3s, color 0.3s;
+  }
+  .char-card:hover .char-epithet {
+    background: var(--gold);
+    color: var(--night);
+  }
+
+  .char-desc {
+    font-size: 0.92rem;
+    line-height: 1.9;
+    color: var(--ink);
+    margin-bottom: 1.2rem;
+  }
+
+  .char-quote {
+    font-family: "Noto Serif JP", serif;
+    font-size: 0.88rem;
+    color: var(--moss-deep);
+    border-left: 2px solid var(--gold);
+    padding: 0.3rem 0 0.3rem 0.9rem;
+    font-style: italic;
+    line-height: 1.7;
+    transition: border-color 0.3s, padding-left 0.3s;
+  }
+  .char-card:hover .char-quote {
+    border-left-color: var(--witch);
+    padding-left: 1.1rem;
+  }
+
+  .char-stat {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--paper-deep);
+    font-family: "Cinzel", serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    color: var(--moss-deep);
+  }
+  .char-stat strong { color: var(--gold); font-weight: 600; }
+
+  /* NPCゾーン */
+  .characters.npc-zone {
+    background: linear-gradient(180deg, var(--paper-deep) 0%, var(--paper) 100%);
+  }
+  .npc-card {
+    background: rgba(255, 250, 235, 0.7);
+    border-left: 3px solid var(--witch);
+  }
+  .npc-card .char-epithet { background: var(--witch); }
+  .npc-card:hover .char-epithet { background: var(--witch-deep); color: var(--bloom); }
+
+  /* ╔═══════════════════════════════════════╗
+     ║  真相セクション「魔女の楽園計画」     ║
+     ╚═══════════════════════════════════════╝ */
+  .truth {
+    background:
+      radial-gradient(ellipse at top, rgba(42, 26, 58, 0.4), transparent 60%),
+      var(--witch-deep);
+    color: var(--paper);
+    position: relative;
+    overflow: hidden;
+  }
+  .truth .section-title { color: var(--paper); }
+  .truth .section-title-en { color: var(--bloom); opacity: 0.7; }
+  .truth .divider { background: var(--bloom); }
+
+  /* 触手のような揺らぎ */
+  .truth::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(ellipse 600px 200px at 20% 30%, rgba(138, 74, 60, 0.08), transparent),
+      radial-gradient(ellipse 500px 300px at 80% 70%, rgba(42, 26, 58, 0.4), transparent),
+      radial-gradient(ellipse 400px 200px at 50% 90%, rgba(138, 74, 60, 0.06), transparent);
+    animation: truth-pulse 8s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  @keyframes truth-pulse {
+    from { opacity: 0.5; transform: scale(1); }
+    to   { opacity: 1.0; transform: scale(1.06); }
+  }
+
+  .truth-block {
+    max-width: 760px;
+    background: rgba(255, 250, 235, 0.04);
+    border: 1px solid rgba(201, 160, 74, 0.3);
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+    backdrop-filter: blur(2px);
+    position: relative;
+    transition: border-color 0.5s, background 0.5s;
+  }
+  .truth-block:hover {
+    border-color: var(--bloom);
+    background: rgba(232, 197, 194, 0.06);
+  }
+  .truth-block::before {
+    content: attr(data-quote);
+    position: absolute;
+    top: -0.7em;
+    right: 1.5rem;
+    font-family: "Cinzel", serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.4em;
+    color: var(--gold);
+    background: var(--witch-deep);
+    padding: 0 0.8em;
+  }
+
+  .truth-block h3 {
+    font-family: "Noto Serif JP", serif;
+    font-weight: 600;
+    font-size: 1.3rem;
+    color: var(--gold-soft);
+    margin-bottom: 1.2rem;
+    letter-spacing: 0.05em;
+  }
+  .truth-block p {
+    font-size: 0.95rem;
+    line-height: 2;
+    color: var(--paper);
+    opacity: 0.9;
+    margin-bottom: 1rem;
+  }
+  .truth-block p:last-child { margin-bottom: 0; }
+  .truth-block strong { color: var(--gold); font-weight: 600; }
+
+  .truth-quote {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--bloom);
+    border-left: 2px solid var(--rust);
+    padding-left: 1rem;
+    margin: 1rem 0;
+    line-height: 2;
+  }
+
+  /* ╔═══════════════════════════════════════╗
+     ║  ハイライト                            ║
+     ╚═══════════════════════════════════════╝ */
+  .highlights {
+    background: linear-gradient(135deg, var(--paper-deep) 0%, var(--paper) 100%);
+  }
+
+  .h-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .h-card {
+    background: #f7efde;
+    padding: 1.8rem;
+    position: relative;
+    border-top: 3px solid var(--gold);
+    box-shadow: 0 8px 24px -10px var(--shadow);
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+                box-shadow 0.4s, border-color 0.4s;
+  }
+  .h-card:hover {
+    transform: translateY(-5px) rotate(-0.3deg);
+    box-shadow: 0 18px 36px -12px var(--shadow);
+    border-top-color: var(--witch);
+  }
+
+  .h-card-icon {
+    font-family: "Cinzel", serif;
+    font-weight: 700;
+    font-size: 1.4rem;
+    color: var(--gold);
+    margin-bottom: 0.6rem;
+    transition: transform 0.4s, color 0.4s;
+  }
+  .h-card:hover .h-card-icon { transform: scale(1.15); color: var(--witch); }
+
+  .h-card-title {
+    font-family: "Noto Serif JP", serif;
+    font-weight: 700;
+    font-size: 1.12rem;
+    margin-bottom: 0.7rem;
+    line-height: 1.4;
+  }
+  .h-card-body { font-size: 0.91rem; line-height: 1.8; color: var(--ink); }
+  .h-card-tag {
+    display: inline-block;
+    margin-top: 0.8rem;
+    font-family: "Cinzel", serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--moss-deep);
+  }
+
+  /* ╔═══════════════════════════════════════╗
+     ║  神語録セクション(このシナリオ目玉)   ║
+     ╚═══════════════════════════════════════╝ */
+  .scriptures {
+    background:
+      radial-gradient(ellipse at center, rgba(201, 160, 74, 0.06) 0%, transparent 60%),
+      var(--night);
+    color: var(--paper);
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+  }
+  .scriptures::before {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 140vmin;
+    height: 140vmin;
+    transform: translate(-50%, -50%);
+    background:
+      conic-gradient(from 0deg,
+        transparent 0deg,
+        rgba(201, 160, 74, 0.04) 30deg,
+        transparent 60deg,
+        rgba(201, 160, 74, 0.06) 120deg,
+        transparent 180deg,
+        rgba(201, 160, 74, 0.03) 240deg,
+        transparent 300deg);
+    animation: god-rays 60s linear infinite;
+    pointer-events: none;
+  }
+  .scriptures > * { position: relative; z-index: 1; }
+  .scriptures .section-title { color: var(--paper); }
+  .scriptures .section-title-en { color: var(--gold-soft); opacity: 0.8; }
+  .scriptures .divider { background: var(--gold-bright); margin-left: auto; margin-right: auto; }
+
+  .verses {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.2rem;
+    margin-top: 1rem;
+    text-align: left;
+  }
+
+  .verse {
+    border: 1px solid rgba(201, 160, 74, 0.3);
+    padding: 1.6rem 1.8rem;
+    background: rgba(201, 160, 74, 0.04);
+    position: relative;
+    transition: border-color 0.4s, background 0.4s, transform 0.4s;
+  }
+  .verse:hover {
+    border-color: var(--gold-bright);
+    background: rgba(201, 160, 74, 0.08);
+    transform: translateY(-3px);
+  }
+  .verse::before {
+    content: "❝";
+    position: absolute;
+    top: -0.2rem;
+    left: 0.5rem;
+    font-family: "Cormorant Garamond", serif;
+    font-size: 2.4rem;
+    color: var(--gold);
+    line-height: 1;
+    opacity: 0.6;
+  }
+
+  .verse-line {
+    font-family: "Noto Serif JP", serif;
+    font-size: 1.02rem;
+    color: var(--paper);
+    line-height: 1.9;
+    padding-left: 1.5rem;
+    font-weight: 500;
+  }
+  .verse-context {
+    margin-top: 0.8rem;
+    padding-left: 1.5rem;
+    font-family: "Cinzel", serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--gold-soft);
+    opacity: 0.75;
+  }
+
+  /* ╔═══════════════════════════════════════╗
+     ║  エピローグ                            ║
+     ╚═══════════════════════════════════════╝ */
+  .epilogue {
+    background: linear-gradient(180deg, var(--paper) 0%, #f5edd9 100%);
+    text-align: center;
+    padding: 9rem 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .epilogue::before {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 100vmin;
+    height: 100vmin;
+    background: radial-gradient(circle, rgba(212, 184, 132, 0.18) 0%, transparent 50%);
+    transform: translate(-50%, -50%);
+    animation: epilogue-glow 8s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  @keyframes epilogue-glow {
+    from { opacity: 0.5; transform: translate(-50%, -50%) scale(0.95); }
+    to   { opacity: 1.0; transform: translate(-50%, -50%) scale(1.05); }
+  }
+  .epilogue > * { position: relative; z-index: 1; }
+
+  .epilogue-mark {
+    font-family: "Cinzel", serif;
+    color: var(--gold);
+    letter-spacing: 0.5em;
+    margin-bottom: 1.5rem;
+    font-weight: 500;
+  }
+
+  .epilogue h2 {
+    font-family: "Noto Serif JP", serif;
+    font-weight: 900;
+    font-size: clamp(1.6rem, 3.6vw, 2.4rem);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+  }
+  .epilogue h2 span {
+    display: block;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 1s ease, transform 1s ease;
+  }
+  .epilogue.is-visible h2 span:nth-child(1) { transition-delay: 0.2s; opacity: 1; transform: none; }
+  .epilogue.is-visible h2 span:nth-child(2) { transition-delay: 0.5s; opacity: 1; transform: none; }
+
+  .epilogue p {
+    max-width: 620px;
+    margin: 0 auto 1.2rem;
+    line-height: 2.1;
+    color: var(--moss-deep);
+  }
+
+  .epilogue-end {
+    margin-top: 3rem;
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    font-size: 1.4rem;
+    color: var(--gold);
+    position: relative;
+    display: inline-block;
+  }
+  .epilogue-end::after {
+    content: "";
+    position: absolute;
+    bottom: -6px;
+    left: 0;
+    width: 0;
+    height: 1px;
+    background: var(--gold);
+    transition: width 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) 1s;
+  }
+  .epilogue.is-visible .epilogue-end::after { width: 100%; }
+
+  footer {
+    background: var(--ink);
+    color: var(--gold-soft);
+    text-align: center;
+    padding: 2rem;
+    font-family: "Cinzel", serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.3em;
+  }
+
+  /* レスポンシブ */
+  @media (max-width: 600px) {
+    section { padding: 5rem 1.5rem; }
+    .hero-info { gap: 1.5rem; }
+    .timeline-track { padding-left: 1.8rem; margin-left: 0.5rem; }
+    .timeline-item::before { left: -2.3rem; }
+    .truth-block { padding: 1.8rem 1.4rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+    [data-reveal] { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="grain"></div>
+<div class="mood-overlay"></div>
+<div class="progress-bar"></div>
+<div class="cursor-ring"></div>
+<div class="cursor-dot"></div>
+
+<!-- ━━━ HERO ━━━ -->
+<header class="hero">
+  <div class="magic-circle">
+    <svg viewBox="0 0 800 800" preserveAspectRatio="xMidYMid meet">
+      <g class="ring-rotate-slow">
+        <circle class="draw-stroke" cx="400" cy="400" r="280" fill="none" stroke="#c9a04a" stroke-width="0.4"/>
+        <circle cx="400" cy="400" r="280" fill="none" stroke="#c9a04a" stroke-width="0.4" stroke-dasharray="2,12"/>
+      </g>
+      <g class="ring-rotate-mid">
+        <circle class="draw-stroke" cx="400" cy="400" r="220" fill="none" stroke="#c9a04a" stroke-width="0.5"/>
+        <polygon points="400,180 591,510 209,510" fill="none" stroke="#c9a04a" stroke-width="0.4" opacity="0.5"/>
+      </g>
+      <g class="ring-rotate-fast">
+        <circle class="draw-stroke" cx="400" cy="400" r="160" fill="none" stroke="#c9a04a" stroke-width="0.5"/>
+        <polygon points="400,240 540,360 488,540 312,540 260,360" fill="none" stroke="#c9a04a" stroke-width="0.4" opacity="0.5"/>
+      </g>
+      <g class="ring-rotate-slow">
+        <circle cx="400" cy="400" r="100" fill="none" stroke="#e8c870" stroke-width="0.5"/>
+        <line x1="400" y1="300" x2="400" y2="500" stroke="#e8c870" stroke-width="0.3"/>
+        <line x1="300" y1="400" x2="500" y2="400" stroke="#e8c870" stroke-width="0.3"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="particles">
+    <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+    <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+    <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
+  <div class="hero-meta">CALL OF CTHULHU · 第三陣</div>
+  <h1 class="hero-title" id="heroTitle">ドール</h1>
+  <div class="hero-title-en">D&nbsp;O&nbsp;L&nbsp;L</div>
+  <p class="hero-sub">気がつくと、見覚えのない部屋に横たわっていた。<br>足元には魔法陣、台座にはローマ字の自分の名前。<br>所持品は、ない。</p>
+  <div class="hero-info">
+    <div>
+      <div class="hero-info-label">System</div>
+      <div class="hero-info-value">Call of Cthulhu</div>
+    </div>
+    <div>
+      <div class="hero-info-label">Players</div>
+      <div class="hero-info-value">3名 + NPC1</div>
+    </div>
+    <div>
+      <div class="hero-info-label">Status</div>
+      <div class="hero-info-value">Survived</div>
+    </div>
+    <div>
+      <div class="hero-info-label">Result</div>
+      <div class="hero-info-value">Cleared</div>
+    </div>
+  </div>
+  <div class="scroll-hint">SCROLL</div>
+</header>
+
+<!-- ━━━ あらすじ ━━━ -->
+<section class="story" data-reveal data-mood-color="rgba(0, 0, 0, 0)">
+  <div class="section-num">— I —</div>
+  <h2 class="section-title">あらすじ</h2>
+  <p class="section-title-en">Synopsis</p>
+  <div class="divider"></div>
+
+  <div class="story-text">
+    <p>家に帰り寝床について眠ったはずの探索者たちが、目を覚ました先は燭台だけが照らす薄暗い部屋だった。台座に刻まれた自分の名前。床に描かれた魔法陣。所持品は、ない。記憶のどこかに、大切な何かを忘れているような感覚だけが残っている。</p>
+
+    <p>奈良県民の神父・天童は「ここは神の試練の間」と即座に断定し、自称大学生探偵・天霧くれいすは「ドアを殴りましょっか」と即物的解決を提案、天才高校生・詩星御伽は「協力して整理しましょう」と冷静に場をまとめる。お助けNPCの幾望智は、ただただツッコミに徹していた。</p>
+
+    <p>顔に人面、前足が人の手のネズミ怪物が天井から降ってきても、神父は信用ロールでスペシャル＆クリティカルを連発し、化け物2匹を信者にしてしまう。寝室、書庫、暖炉の隠し部屋——館を巡るうちに見つかる呪文「門の発見」、英和辞典、人形魔術の本。そして「やる夫」と名乗るメモの主と、行方不明の女優・佐倉香奈の手記。</p>
+
+    <p>2階の儀式の間に並ぶ数十体の「人形」。それは触れれば人肌で、生気のない人間そのものだった。名前を彫った台座の魔法陣はマジック書き——アルコールで消し、宝石化された記憶を取り戻させることで、人形たちは目覚めはじめる。</p>
+
+    <p>魔女リーゼロッテと直接対峙することはなかった。しかし、年単位で囚われていた被害者たちを連れて銀の門を起動させ、神父は屋敷に書き置きを残す——「次は私から迎えに行くとしよう」。星空の下、街に帰還した探索者たちは、満点の星空を一生忘れないだろう。</p>
+  </div>
+</section>
+
+<!-- ━━━ タイムライン ━━━ -->
+<section class="timeline" data-reveal data-mood-color="rgba(7, 8, 13, 0.18)">
+  <div class="section-num">— II —</div>
+  <h2 class="section-title">あの日の記録</h2>
+  <p class="section-title-en">Voyage Log</p>
+  <div class="divider"></div>
+
+  <div class="timeline-track">
+    <div class="timeline-item god" style="--i:0" data-reveal-item>
+      <div class="timeline-act">ACT 01<span class="timeline-tag">神、目覚め賜う</span></div>
+      <div class="timeline-head">「ハッ！！！！」</div>
+      <div class="timeline-body">
+        薄暗い部屋で目覚める4人。天童・神・弓彦が即座に「神の御膳か」と立ち上がり、くれいすが「誘拐犯ですか！？」と通報を試み、智が「うるさ」と呟く。<span class="roll crit">アイデア スペシャル</span>で「家で寝床に着いたところまでは思い出せる」が、心にぽっかり穴が空いた感覚だけが残る。
+      </div>
+    </div>
+
+    <div class="timeline-item" style="--i:1" data-reveal-item>
+      <div class="timeline-act">ACT 02<span class="timeline-tag">魔法陣の間</span></div>
+      <div class="timeline-head">台座と魔法陣</div>
+      <div class="timeline-body">
+        探索箇所はドア・台・模様・燭台。台座にはアルファベットで自分の名前が刻まれており、「私たちは狙われた」と御伽が看破。模様は<span class="roll">知識</span>成功で<strong>油性マジックで描かれていて消えない</strong>と判明。燭台は燃やせそう。「とりあえずドア殴りましょっか」とくれいす。
+      </div>
+    </div>
+
+    <div class="timeline-item witch" style="--i:2" data-reveal-item>
+      <div class="timeline-act">ACT 03<span class="timeline-tag">天井からの来訪者</span></div>
+      <div class="timeline-head">人面ネズミ襲来</div>
+      <div class="timeline-body">
+        ドアを開けると、天井から走る音。人間の顔と手を持つネズミ怪物が2体降ってくる。<span class="roll fail">SAN 0/1d6</span>。智がSAN-6で、御伽は1日に2回も事件に巻き込まれて可哀想と評される。神父は「お前の神はなんと言っている？」と語りかける戦闘を開始。
+      </div>
+    </div>
+
+    <div class="timeline-item god" style="--i:3" data-reveal-item>
+      <div class="timeline-act">ACT 04<span class="timeline-tag">信用 連続CRIT</span></div>
+      <div class="timeline-head">ネズミ、改宗す</div>
+      <div class="timeline-body">
+        神父が信用ロールを連続で振る。1体目に<span class="roll crit">クリティカル 3</span>、続けてもう1体にも<span class="roll crit">スペシャル 8</span>。ネズミ怪物は完全な信者と化し「MY GOD!!!」「YES YOUR GOD!」と叫び始める。戦闘は強制終了、信者NPCが2体追加された。
+      </div>
+    </div>
+
+    <div class="timeline-item" style="--i:4" data-reveal-item>
+      <div class="timeline-act">ACT 05<span class="timeline-tag">やる夫メモ</span></div>
+      <div class="timeline-head">丸い部屋、丸いメモ</div>
+      <div class="timeline-body">
+        円形の部屋に丸いメモ。「悪しき魔女に誘拐されたんだお。出口は存在するお。書庫にヒントを残しておいたお」と謎の語尾。読むと連れ去られた時の記憶が蘇り、<span class="roll fail">SAN -2</span>。「角恐怖症」とくれいすが推理する。
+      </div>
+    </div>
+
+    <div class="timeline-item witch" style="--i:5" data-reveal-item>
+      <div class="timeline-act">ACT 06<span class="timeline-tag">魔女の寝室</span></div>
+      <div class="timeline-head">英和辞典と『鍵』</div>
+      <div class="timeline-body">
+        豪華な寝室。鏡台には香水とアクセサリーが雑多に。ベッド下から<strong>『鍵』</strong>を発見、思い出せ、くれいすとはギリシャ語で鍵だ。鏡台からは<strong>『英和辞典』</strong>。日記からは魔女の名「リーゼロッテ」と、楽園を完成させようとしている記述が判明。
+      </div>
+    </div>
+
+    <div class="timeline-item witch" style="--i:6" data-reveal-item>
+      <div class="timeline-act">ACT 07<span class="timeline-tag">書庫</span></div>
+      <div class="timeline-head">門の発見、魔導書、佐倉香奈</div>
+      <div class="timeline-body">
+        鍵で開いた書庫の3区画。手前から<strong>『門の発見』</strong>呪文（コスト1MP・1d3SAN）、真ん中から<strong>『魔導書』</strong>、奥から<strong>『佐倉香奈の手帳』</strong>。<span class="roll">知識</span>成功で「数年前、行方不明となった女優」と一致することが分かる。「犠牲者は私達でピリオドです」とくれいす。
+      </div>
+    </div>
+
+    <div class="timeline-item" style="--i:7" data-reveal-item>
+      <div class="timeline-act">ACT 08<span class="timeline-tag">致命的失敗祭り</span></div>
+      <div class="timeline-head">仕事机、暖炉、宝石</div>
+      <div class="timeline-body">
+        2階の暖炉のある部屋。御伽が目星<span class="roll fail">致命的失敗 100</span>でコケて仕事机をぶちまける。立て直して『人形魔術について』本と『アルコール』を発見。神父が暖炉に手を入れても熱くない——<strong>幻</strong>と看破、奥に隠し部屋。輝く宝石に触れると、奪われていた大切な思い出が戻ってくる。
+      </div>
+    </div>
+
+    <div class="timeline-item witch" style="--i:8" data-reveal-item>
+      <div class="timeline-act">ACT 09<span class="timeline-tag">人形ルーム</span></div>
+      <div class="timeline-head">数十体のドール</div>
+      <div class="timeline-body">
+        下の階で見つけたコレクションの間。等身大の「人形」が何十体も並ぶが、触れれば人肌、冷たく生気がない。<span class="roll fail">SAN 1/1d4</span>。台座には「KANA SAKURA」、「YARUO（DT、NEET）」、そして自分たちの名前も。<strong>魔法陣はマジックで描かれている</strong>——アルコールで消せる、と御伽がひらめく。
+      </div>
+    </div>
+
+    <div class="timeline-item god" style="--i:9" data-reveal-item>
+      <div class="timeline-act">ACT 10<span class="timeline-tag">記憶の宝石</span></div>
+      <div class="timeline-head">人形たち、目覚める</div>
+      <div class="timeline-body">
+        アルコールで魔法陣を消し、神父の上着に宝石を包んで運搬。一個ずつ落として人形に触れさせると——人形化が解け、人々が目覚めていく。神父はやる夫の宝石に触れて「親友やる夫」の記憶が流入、<span class="roll fail">SAN -1</span>。やる夫は<strong>永久発狂</strong>で「親友！！！」状態に。
+      </div>
+    </div>
+
+    <div class="timeline-item god" style="--i:10" data-reveal-item>
+      <div class="timeline-act">ACT 11<span class="timeline-tag">脱出</span></div>
+      <div class="timeline-head">銀の門、満天の星空</div>
+      <div class="timeline-body">
+        丸メモを焼いて灰を作り、御伽が「灰被り、然るべき地で唱えれば、門見ゆる」と詠唱。最初の部屋に銀色の光が出現。神父は屋敷に書き置きを残す——「次は私から迎えに行くとしよう」。光をくぐり抜けると、よく知る街、満点の星空。最後にくれいすのパンチが神父に決まり、シナリオクリア。
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="ornament">✦&nbsp;&nbsp;✦&nbsp;&nbsp;✦</div>
+
+<!-- ━━━ キャラクター・PC ━━━ -->
+<section class="characters" data-reveal data-mood-color="rgba(0, 0, 0, 0)">
+  <div class="section-num">— III —</div>
+  <h2 class="section-title">登場人物・探索者</h2>
+  <p class="section-title-en">Player Characters</p>
+  <div class="divider"></div>
+
+  <div class="char-grid">
+    <div class="char-card" data-reveal style="--delay: 0s">
+      <span class="corner-tr"></span><span class="corner-bl"></span>
+      <div class="char-tag">PC · 01</div>
+      <div class="char-name">天童・神・弓彦</div>
+      <div class="char-reading">てんどう ゴッド ゆみひこ</div>
+      <span class="char-epithet">神の代弁者・神父</span>
+      <p class="char-desc">奈良県民。神をひたむきに信じる神父であり、ゆうちょ銀行本社の地下で行われるギャンブルの常連。お金より神の布教活動が目的。スマスロ ミリオンゴッド神々の軌跡を信じよ。信用ロールが異常に強く、ネズミ怪物2匹を瞬時に信者化した本セッションの主人公。<strong>大切な思い出</strong>は親友やる夫との誕生日。</p>
+      <p class="char-quote">「神を信じるか？　ならば私を信じろ。私は神だ」</p>
+      <div class="char-stat">信用 <strong>75</strong> · 杖術 <strong>75</strong> · 精神分析 <strong>76</strong> · SAN <strong>70→78</strong></div>
+    </div>
+
+    <div class="char-card" data-reveal style="--delay: 0.1s">
+      <span class="corner-tr"></span><span class="corner-bl"></span>
+      <div class="char-tag">PC · 02</div>
+      <div class="char-name">詩星 御伽</div>
+      <div class="char-reading">しほし おとぎ</div>
+      <span class="char-epithet">天才高校生</span>
+      <p class="char-desc">幅広い学問を修める天才高校生。落ち着いた敬語、心理学・物理学・図書館・知識すべて高水準。冷静沈着に状況を整理する役回り——のはずが、仕事机の前でDEX致命的失敗を出し机をぶちまける。<strong>大切な思い出</strong>は、かつて狂信者の手から救ってくれた人々のこと。</p>
+      <p class="char-quote">「率直に、端的に申し上げると……まずいのではないでしょうか」</p>
+      <div class="char-stat">知識 <strong>105</strong> · 図書館 <strong>100</strong> · 心理学 <strong>90</strong> · 「門の発見」習得</div>
+    </div>
+
+    <div class="char-card" data-reveal style="--delay: 0.2s">
+      <span class="corner-tr"></span><span class="corner-bl"></span>
+      <div class="char-tag">PC · 03</div>
+      <div class="char-name">天霧 くれいす</div>
+      <div class="char-reading">あまぎ くれいす</div>
+      <span class="char-epithet">自称・大学生探偵</span>
+      <p class="char-desc">クソチビだがお酒は飲める歳。「くれいす」はギリシャ語で「鍵」、探偵用の仮名。元気いっぱい事件大好き、悪は許さん絶許滅。格闘技マッチョ師匠が手作りしてくれたフリフリ可愛い探偵服が宝物。困ったらまず物理。神父にパンチを当てて締めた本セッションの締めの女。</p>
+      <p class="char-quote">「とりあえずドア殴りましょっか！」</p>
+      <div class="char-stat">こぶし <strong>70</strong> · 目星 <strong>65</strong> · SIZ <strong>+1</strong> · SAN <strong>58→74</strong></div>
+    </div>
+
+    <div class="char-card" data-reveal style="--delay: 0.3s">
+      <span class="corner-tr"></span><span class="corner-bl"></span>
+      <div class="char-tag">NPC · 04</div>
+      <div class="char-name">幾望 智</div>
+      <div class="char-reading">きぼう さとる</div>
+      <span class="char-epithet">お助けNPC・21歳大学生</span>
+      <p class="char-desc">「ロルプとPCが失敗したときしか振らない」と宣言したお助け枠。クトゥルフ神話技能25持ちで「破裂の刻印」「シュブ＝ニグラス」など即看破できそうだったが、結局ツッコミ役に徹する。神父の暴走に「うっせえ、爺さん」「死ね」とバッサリ。「俺が自我を出してはいけないとガンダムが言っている」のメタ発言が秀逸。</p>
+      <p class="char-quote">「俺の行く先はいっつもこうだな」</p>
+      <div class="char-stat">クトゥルフ神話 <strong>25</strong> · ロール <strong>NPCゆえ</strong> · 役割: ツッコミ</div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━ NPC ━━━ -->
+<section class="characters npc-zone" data-reveal data-mood-color="rgba(42, 26, 58, 0.1)">
+  <div class="section-num">— IV —</div>
+  <h2 class="section-title">登場人物・NPC</h2>
+  <p class="section-title-en">Non-Player Characters</p>
+  <div class="divider"></div>
+
+  <div class="char-grid">
+    <div class="char-card npc-card" data-reveal style="--delay: 0s">
+      <span class="corner-tr"></span><span class="corner-bl"></span>
+      <div class="char-tag">NPC · WITCH</div>
+      <div class="char-name">リーゼロッテ</div>
+      <div class="char-reading">Lieselotte</div>
+      <span class="char-epithet">楽園を求める魔女</span>
+      <p class="char-desc">館の主にして黒幕。「人の意志」を取り出す実験を続けており、それを使って自身の楽園を完成させようとしている。日記には「また解けてしまった。どうやらまだ不完全のようだ」と研究の進捗が記されていた。本セッションでは姿を見せず、館に書き置きを残された側として去る。</p>
+      <p class="char-quote">「これで私の楽園を完成させられる」</p>
+      <div class="char-stat">役割: 黒幕（不在） · 結末: 神父から書き置きを受け取る</div>
+    </div>
+
+    <div class="char-card npc-card" data-reveal style="--delay: 0.1s">
+      <span class="corner-tr"></span><span class="corner-bl"></span>
+      <div class="char-tag">NPC · YARUO</div>
+      <div class="char-name">やる夫</div>
+      <div class="char-reading">YARUO（DT、NEET）</div>
+      <span class="char-epithet">親友（自称・確定）</span>
+      <p class="char-desc">過去の被害者にして人形ルーム住人。すべての語尾に「お」がつく謎文体でメモを残し、後続の被害者を救う情報を遺した恩人。神父が宝石に触れた瞬間、流れ込む「天と地、即ち天井の王と地獄の王として共に歩んだ親友」記憶。だがそれは魔女が捏造した記憶——だが、もう永久発狂で「親友！！！」が確定済み。</p>
+      <p class="char-quote">『お、天童だお！またギャンブル負けたのかお？』</p>
+      <div class="char-stat">役割: メモの男 / 親友 · 結末: 永久発狂のまま帰還</div>
+    </div>
+
+    <div class="char-card npc-card" data-reveal style="--delay: 0.2s">
+      <span class="corner-tr"></span><span class="corner-bl"></span>
+      <div class="char-tag">NPC · ACTRESS</div>
+      <div class="char-name">佐倉 香奈</div>
+      <div class="char-reading">KANA SAKURA</div>
+      <span class="char-epithet">行方不明だった女優</span>
+      <p class="char-desc">数年前に突如行方不明になった女優。書庫の手帳に「これを読んでいるあなたが犠牲者でないことを祈ります」というメッセージを残していた。その手帳が探索者たちの推理の決定打となる。人形ルームから救出され、無事に帰還。「ボディーガード」を引いた目で見ながらくれいすに連れられて元の生活へ。</p>
+      <p class="char-quote">「……たす……かるの……？」</p>
+      <div class="char-stat">役割: 過去の被害者・最大の手がかり · 結末: 救出成功</div>
+    </div>
+
+    <div class="char-card npc-card" data-reveal style="--delay: 0.3s">
+      <span class="corner-tr"></span><span class="corner-bl"></span>
+      <div class="char-tag">NPC · BEAST</div>
+      <div class="char-name">JELLY ＆ MICKEY</div>
+      <div class="char-reading">人面ネズミ怪物</div>
+      <span class="char-epithet">改宗済み信者</span>
+      <p class="char-desc">人間の顔と手を持つネズミの怪物。冷静動物マシーンを狙って降下したのに、神父の信用クリティカル＆スペシャル連発で完全に信者化された不憫な化け物。「MY GOD」「YES YOUR GOD」「ALL HAIL TENDOU」と英語で叫び、合流時にはサトルを含めた人間の方が困惑する事態に。最終的にも信者として神父に持ち帰られた。</p>
+      <p class="char-quote">「I pledge my loyalty to you once again」</p>
+      <div class="char-stat">役割: 強敵→信者 · 結末: 神父の所持品となる</div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━ 真相 ━━━ -->
+<section class="truth" data-reveal data-mood-color="rgba(42, 26, 58, 0.22)">
+  <div class="section-num">— V —</div>
+  <h2 class="section-title">魔女の楽園計画</h2>
+  <p class="section-title-en">The Witch's Paradise</p>
+  <div class="divider"></div>
+
+  <div class="truth-block" data-quote="DIARY" data-reveal style="--delay: 0s">
+    <h3>解けてしまった、何度も</h3>
+    <p>魔女リーゼロッテは、長い時間をかけて<strong>人の意志を取り出す実験</strong>を繰り返してきた。彼女が望むのは「楽園」の完成。だが何度試みても術式は解け、被験者は元に戻ってしまう。</p>
+    <p class="truth-quote">「また解けてしまった。どうやらまだ不完全のようだ」</p>
+  </div>
+
+  <div class="truth-block" data-quote="BREAKTHROUGH" data-reveal style="--delay: 0.15s">
+    <h3>意志の、取り出し</h3>
+    <p>研究を重ねた末、ついに<strong>意志を「宝石」として取り出すこと</strong>に成功する。意志を抜かれた肉体は人形となり、コレクションの間に並べられた。台座には被害者の名前を刻み、囲むように魔法陣を描いて、人形化を持続させる。</p>
+    <p class="truth-quote">「手間はかかるが、ついに意志の取り出しに成功した」</p>
+  </div>
+
+  <div class="truth-block" data-quote="FATAL FLAW" data-reveal style="--delay: 0.3s">
+    <h3>致命的な、油断</h3>
+    <p>本来、魔法陣は欠けると人形化が解ける。だが彼女は——<strong>マジックで魔法陣を描いていた</strong>。書庫の本にすら「マジックで描いてる馬鹿は居ないだろうが」と注意書きがあるにもかかわらず。アルコール一本で消せる脆さこそが、彼女の楽園を瓦解させた。</p>
+    <p class="truth-quote">「少しでも陣が欠けていると成功しない」——本人の本より引用</p>
+  </div>
+
+  <div class="truth-block" data-quote="NOW" data-reveal style="--delay: 0.45s">
+    <h3>そして、神は宣戦布告した</h3>
+    <p>探索者たちは魔法陣を消し、宝石化された記憶を人形たちに戻し、書庫で見つけた呪文「門の発見」で銀の門を開いた。捕らわれていた被害者たちもろとも、街に帰還する。</p>
+    <p>魔女との直接対決はなかった。だが神父は屋敷に書き置きを残した——</p>
+    <p class="truth-quote">「次は私から迎えに行くとしよう / 神より」</p>
+  </div>
+</section>
+
+<!-- ━━━ 名場面 ━━━ -->
+<section class="highlights" data-reveal data-mood-color="rgba(0, 0, 0, 0)">
+  <div class="section-num">— VI —</div>
+  <h2 class="section-title">名場面ピックアップ</h2>
+  <p class="section-title-en">Highlights</p>
+  <div class="divider"></div>
+
+  <div class="h-grid">
+    <div class="h-card" data-reveal style="--delay: 0s">
+      <div class="h-card-icon">I.</div>
+      <div class="h-card-title">「神を信じるか？」</div>
+      <div class="h-card-body">セッション開始30秒、自己紹介より早く神父が宣戦布告。10D100、5D100、10D100と謎のダイスを連投し、御伽は「磔にする」、希心観戦は「狂信？なら宇宙か」と即座にツッコミ。卓の空気がGM「何だこいつ〜！」で確定する。</div>
+      <div class="h-card-tag">— 開幕</div>
+    </div>
+
+    <div class="h-card" data-reveal style="--delay: 0.08s">
+      <div class="h-card-icon">II.</div>
+      <div class="h-card-title">ネズミ、改宗祭り</div>
+      <div class="h-card-body">本来恐ろしい怪物のはずのネズミ怪物2体に、神父が信用ロールでスペシャル＆クリティカルを連発。「MY GOD!!!」「YES YOUR GOD」「ALL HAIL TENDOU」とネズミが英語で叫び始め、戦闘終了。GM「お前何ができんねんｗ」</div>
+      <div class="h-card-tag">— ACT04</div>
+    </div>
+
+    <div class="h-card" data-reveal style="--delay: 0.16s">
+      <div class="h-card-icon">III.</div>
+      <div class="h-card-title">テンド"ウユミ"ヒコ事件</div>
+      <div class="h-card-body">くれいすが神父の名前を読み間違え、以降「ウユニ様」が定着。塩湖。神父も否定せず、御伽も「ウユニ様ならどっちを選びますか」と乗っかり、本来の名前は誰の口にも上らなくなった。</div>
+      <div class="h-card-tag">— あだ名</div>
+    </div>
+
+    <div class="h-card" data-reveal style="--delay: 0.24s">
+      <div class="h-card-icon">IV.</div>
+      <div class="h-card-title">仕事机ぶちまけ事件</div>
+      <div class="h-card-body">2階の仕事机を調べようと目星を振った御伽が<span class="roll fail">致命的失敗 100</span>。コケて机がめちゃくちゃに。「次の目星と図書館-20」のペナルティ。御伽「んぎゃぅっ！？」、神父「神は当然手伝うこともできる」と参戦。</div>
+      <div class="h-card-tag">— ACT08</div>
+    </div>
+
+    <div class="h-card" data-reveal style="--delay: 0.32s">
+      <div class="h-card-icon">V.</div>
+      <div class="h-card-title">暖炉、熱くないが？</div>
+      <div class="h-card-body">2階の暖炉に違和感。神父が直接手を入れて熱さを感じない、仰いでも揺らがない、魔導書を投げ入れたら吸い込まれる——「やはり幻か。くだらん」。隠し部屋ルートが開通する。</div>
+      <div class="h-card-tag">— 神は現場主義者</div>
+    </div>
+
+    <div class="h-card" data-reveal style="--delay: 0.40s">
+      <div class="h-card-icon">VI.</div>
+      <div class="h-card-title">マジックで描いてる馬鹿</div>
+      <div class="h-card-body">書庫の人形魔術本に「まあまさかマジックで描いてる馬鹿は居ないだろうが」の一文。人形ルームの魔法陣を見て——油性マジック。完全アウト。アルコール一本で楽園が瓦解する瞬間に、卓全員が同時に気づく快感。</div>
+      <div class="h-card-tag">— 魔女の致命傷</div>
+    </div>
+
+    <div class="h-card" data-reveal style="--delay: 0.48s">
+      <div class="h-card-icon">VII.</div>
+      <div class="h-card-title">親友やる夫、降臨</div>
+      <div class="h-card-body">人形化を解くため宝石に触れた神父に、流入する「天と地、即ち天井の王と地獄の王として共に歩んだ親友」のニセ記憶。神父の方は<span class="roll">SAN</span>耐え、対するやる夫は<strong>永久発狂</strong>で「親友！！！」状態に。GM「草」</div>
+      <div class="h-card-tag">— ACT10</div>
+    </div>
+
+    <div class="h-card" data-reveal style="--delay: 0.56s">
+      <div class="h-card-icon">VIII.</div>
+      <div class="h-card-title">最後の一発</div>
+      <div class="h-card-body">無事街に戻り、満点の星空。「景気付けに最後の神との相対を求めます！！」とくれいすが宣言、こぶし<span class="roll">70</span>で成功、1d3で2ダメージ。神父「神を試してんじゃねえええええ！」、佐倉香奈は「え、ええ……ボディーガード……」と引いていた。</div>
+      <div class="h-card-tag">— エピローグ直前</div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━ 神語録 ━━━ -->
+<section class="scriptures" data-reveal data-mood-color="rgba(7, 8, 13, 0.3)">
+  <div class="section-num">— VII —</div>
+  <h2 class="section-title">神 ・ 語 録</h2>
+  <p class="section-title-en">The Scriptures of Tendō</p>
+  <div class="divider"></div>
+
+  <div class="verses">
+    <div class="verse" data-reveal style="--delay: 0s">
+      <div class="verse-line">神を信じるか？　ならば私を信じろ。私は神だ。</div>
+      <div class="verse-context">— 開幕第一声</div>
+    </div>
+    <div class="verse" data-reveal style="--delay: 0.08s">
+      <div class="verse-line">これは神が与えた試練だ。私は全て理解している。</div>
+      <div class="verse-context">— 目覚めの間にて</div>
+    </div>
+    <div class="verse" data-reveal style="--delay: 0.16s">
+      <div class="verse-line">神は人を攫わない。神は目的を持って人を呼ぶ。</div>
+      <div class="verse-context">— 教義第一条</div>
+    </div>
+    <div class="verse" data-reveal style="--delay: 0.24s">
+      <div class="verse-line">この3人、いや…1人と1匹と１柱、始まりの異なる種が巡り会えたこの状況こそが我々の天啓なのだ。</div>
+      <div class="verse-context">— ネズミ改宗時</div>
+    </div>
+    <div class="verse" data-reveal style="--delay: 0.32s">
+      <div class="verse-line">神に物理という道理は存在しない。全てに神は存在するのだ。</div>
+      <div class="verse-context">— 暖炉に手を入れて</div>
+    </div>
+    <div class="verse" data-reveal style="--delay: 0.40s">
+      <div class="verse-line">魔女は神により案内させられている。これは全て神の掌の上。万物万象は神の手中にあり！</div>
+      <div class="verse-context">— 廊下にて</div>
+    </div>
+    <div class="verse" data-reveal style="--delay: 0.48s">
+      <div class="verse-line">神は誰の頭からもでてこないのだから、人形には心など無いか。</div>
+      <div class="verse-context">— 人形ルームにて</div>
+    </div>
+    <div class="verse" data-reveal style="--delay: 0.56s">
+      <div class="verse-line">神は全能であり全知だ。当然手伝う事もできる。</div>
+      <div class="verse-context">— 御伽の致命的失敗を目撃して</div>
+    </div>
+    <div class="verse" data-reveal style="--delay: 0.64s">
+      <div class="verse-line">己の神を信じるのだ。そうすれば道は開かれ、眩しい未来が待っているのだ。</div>
+      <div class="verse-context">— 信用ロール失敗後</div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━ エピローグ ━━━ -->
+<section class="epilogue" data-reveal data-mood-color="rgba(212, 184, 132, 0)">
+  <div class="epilogue-mark">— FINIS —</div>
+  <h2>
+    <span>満点の星空が、戻ってくる。</span>
+    <span>その景色を、一生忘れない。</span>
+  </h2>
+  <p data-reveal style="--delay: 0.6s">
+    銀の光をくぐり抜けると、見覚えのある街。<br>
+    見上げた空には、いつもなら気にも留めない満点の星空。<br>
+    それは、無事に帰ってきたという、何よりの証だった。
+  </p>
+  <p data-reveal style="--delay: 0.8s">
+    佐倉香奈は数年ぶりに帰宅した。<br>
+    やる夫は親友！！状態のまま。<br>
+    ネズミ達は神父の所持品となった。
+  </p>
+  <p style="margin-top: 2.5rem; font-size: 0.95rem; opacity: 0.8; --delay: 1s;" data-reveal>
+    そして、屋敷には書き置きが残された——<br>
+    「次は私から迎えに行くとしよう」<br>
+    まだ、見ぬ魔女との戦いが、これから始まる。
+  </p>
+  <div class="epilogue-end">— Yes, Your God. —</div>
+</section>
+
+<footer>
+  DOLL · CHAPTER 3 · CALL OF CTHULHU SESSION LOG
+</footer>
+
+<script>
+(function() {
+  'use strict';
+
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ヒーロータイトルを文字単位に分割 */
+  const titleEl = document.getElementById('heroTitle');
+  if (titleEl) {
+    const text = titleEl.textContent;
+    titleEl.textContent = '';
+    [...text].forEach((ch, i) => {
+      const span = document.createElement('span');
+      span.className = 'ch';
+      span.style.setProperty('--i', i);
+      span.textContent = ch;
+      titleEl.appendChild(span);
+    });
+  }
+
+  /* カスタムカーソル */
+  const dot = document.querySelector('.cursor-dot');
+  const ring = document.querySelector('.cursor-ring');
+  let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+  let dotX = mouseX, dotY = mouseY;
+  let ringX = mouseX, ringY = mouseY;
+
+  if (!prefersReducedMotion && dot && ring) {
+    window.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    }, { passive: true });
+
+    function animateCursor() {
+      dotX += (mouseX - dotX) * 0.85;
+      dotY += (mouseY - dotY) * 0.85;
+      ringX += (mouseX - ringX) * 0.18;
+      ringY += (mouseY - ringY) * 0.18;
+      dot.style.transform = `translate(${dotX}px, ${dotY}px) translate(-50%, -50%)`;
+      ring.style.transform = `translate(${ringX}px, ${ringY}px) translate(-50%, -50%)`;
+      requestAnimationFrame(animateCursor);
+    }
+    animateCursor();
+
+    const hoverTargets = 'a, button, .char-card, .h-card, .verse, .truth-block, .timeline-item, .roll';
+    document.querySelectorAll(hoverTargets).forEach(el => {
+      el.addEventListener('mouseenter', () => document.body.classList.add('hover-active'));
+      el.addEventListener('mouseleave', () => document.body.classList.remove('hover-active'));
+    });
+  }
+
+  /* スクロール進行 + シーンティント */
+  const moodOverlay = document.querySelector('.mood-overlay');
+  const moodSections = document.querySelectorAll('[data-mood-color]');
+
+  let lastScroll = -1;
+  function onScroll() {
+    const scrolled = window.scrollY;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const progress = max > 0 ? Math.min(scrolled / max, 1) : 0;
+
+    if (Math.abs(scrolled - lastScroll) < 1) return;
+    lastScroll = scrolled;
+
+    document.documentElement.style.setProperty('--scroll', progress);
+
+    /* ビューポート中央のセクションのムードカラーを適用 */
+    const viewCenter = scrolled + window.innerHeight / 2;
+    let activeMood = 'rgba(0, 0, 0, 0)';
+    moodSections.forEach(sec => {
+      const top = sec.offsetTop;
+      const bottom = top + sec.offsetHeight;
+      if (viewCenter >= top && viewCenter < bottom) {
+        activeMood = sec.dataset.moodColor || activeMood;
+      }
+    });
+    if (moodOverlay) moodOverlay.style.background = activeMood;
+  }
+
+  let scrollTicking = false;
+  window.addEventListener('scroll', () => {
+    if (!scrollTicking) {
+      requestAnimationFrame(() => {
+        onScroll();
+        scrollTicking = false;
+      });
+      scrollTicking = true;
+    }
+  }, { passive: true });
+  onScroll();
+
+  /* IntersectionObserver: reveal */
+  const revealEls = document.querySelectorAll('[data-reveal]');
+  const itemEls = document.querySelectorAll('[data-reveal-item]');
+
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('is-visible');
+        obs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -60px 0px' });
+  revealEls.forEach(el => obs.observe(el));
+
+  const itemObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('is-visible');
+        itemObs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  itemEls.forEach(el => itemObs.observe(el));
+
+  /* キャラクターカードに3Dティルト */
+  if (!prefersReducedMotion) {
+    const tiltCards = document.querySelectorAll('.char-card');
+    tiltCards.forEach(card => {
+      card.addEventListener('mousemove', (e) => {
+        const r = card.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width;
+        const y = (e.clientY - r.top) / r.height;
+        const rotX = (y - 0.5) * -4;
+        const rotY = (x - 0.5) * 4;
+        card.style.transform = `translateY(-6px) perspective(1000px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = '';
+      });
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
